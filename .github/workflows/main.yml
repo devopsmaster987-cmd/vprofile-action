@@ -12,7 +12,7 @@ on:
 env:
   AWS_REGION: us-west-2
   ECR_REPOSITORY: vprofile
-  EKS_CLUSTER: VPROFILE-EKS
+  EKS_CLUSTER: vprofile-eks
   NAMESPACE: dev
 
 jobs:
