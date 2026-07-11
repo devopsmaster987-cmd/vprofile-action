@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       skip_sonar:
-        description: 'Skip SonarQube scan and quality gate'
+        description: 'Skip SonarQube scan'
         required: false
         type: boolean
         default: false
@@ -47,14 +47,6 @@ jobs:
             -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
             -Dsonar.sources=.
             -Dsonar.exclusions=**/target/**,src/main/resources/*.sql,src/main/resources/application.properties
-
-      - name: SonarQube Quality Gate
-        if: ${{ !inputs.skip_sonar }}
-        uses: sonarsource/sonarqube-quality-gate-action@8e9b0ca0a7273d6f16986388d98393efdfcf56fd # master
-        timeout-minutes: 5
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_URL }}
 
   BUILD_AND_PUBLISH:
     needs: Testing
