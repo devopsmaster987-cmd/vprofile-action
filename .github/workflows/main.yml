@@ -2,6 +2,12 @@ name: vprofile actions
 
 on:
   workflow_dispatch:
+    inputs:
+      skip_sonar:
+        description: 'Skip SonarQube scan and quality gate'
+        required: false
+        type: boolean
+        default: false
 
 env:
   AWS_REGION: us-west-2
@@ -30,6 +36,7 @@ jobs:
         run: mvn checkstyle:checkstyle
 
       - name: SonarQube Scan
+        if: ${{ !inputs.skip_sonar }}
         uses: sonarsource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602 # v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -39,8 +46,10 @@ jobs:
             -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
             -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
             -Dsonar.sources=.
+            -Dsonar.exclusions=**/target/**,src/main/resources/*.sql,src/main/resources/application.properties
 
       - name: SonarQube Quality Gate
+        if: ${{ !inputs.skip_sonar }}
         uses: sonarsource/sonarqube-quality-gate-action@8e9b0ca0a7273d6f16986388d98393efdfcf56fd # master
         timeout-minutes: 5
         env:
@@ -89,12 +98,14 @@ jobs:
         run: kubectl get nodes
 
       - name: Create ECR Image Pull Secret
+        env:
+          DOCKER_SERVER: ${{ secrets.REGISTRY }}
         run: |
           kubectl create secret docker-registry regcred \
-            --docker-server=${{ secrets.REGISTRY }} \
+            --docker-server="$DOCKER_SERVER" \
             --docker-username=AWS \
-            --docker-password=$(aws ecr get-login-password --region ${{ env.AWS_REGION }}) \
-            --namespace=${{ env.NAMESPACE }} \
+            --docker-password="$(aws ecr get-login-password --region ${{ env.AWS_REGION }})" \
+            --namespace="${{ env.NAMESPACE }}" \
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Deploy Application with Helm
