@@ -111,6 +111,8 @@ jobs:
           aws eks update-kubeconfig \
             --region ${{ env.AWS_REGION }} \
             --name ${{ env.EKS_CLUSTER }}
+      - name: Who am I?
+        run: aws sts get-caller-identity
 
       - name: Verify Cluster
         run: |
