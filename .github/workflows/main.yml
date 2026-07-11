@@ -51,7 +51,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Upload image to ECR
-        uses: appleboy/docker-ecr-action@v0.0.3
+        uses: appleboy/docker-ecr-action@174bc7ab545bf5c4f4492240c4d839a987643559 # v0.0.3
         with:
           access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
           secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
