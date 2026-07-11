@@ -20,17 +20,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
+      - name: Checkout Source Code
         uses: actions/checkout@v4
 
-      - name: Set up Java 11
+      - name: Setup Java 11
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "11"
           cache: maven
 
-      - name: Run Maven Tests
+      - name: Run Unit Tests
         run: mvn test
 
       - name: Run Checkstyle
@@ -53,8 +53,11 @@ jobs:
     needs: Testing
     runs-on: ubuntu-latest
 
+    outputs:
+      image-tag: ${{ github.run_number }}
+
     steps:
-      - name: Checkout Code
+      - name: Checkout Source Code
         uses: actions/checkout@v4
 
       - name: Configure AWS Credentials
@@ -71,23 +74,26 @@ jobs:
       - name: Build Docker Image
         run: |
           docker build -t $ECR_REPOSITORY:${{ github.run_number }} .
+
+      - name: Tag Docker Image
+        run: |
           docker tag $ECR_REPOSITORY:${{ github.run_number }} \
           ${{ secrets.REGISTRY }}/$ECR_REPOSITORY:${{ github.run_number }}
 
           docker tag $ECR_REPOSITORY:${{ github.run_number }} \
           ${{ secrets.REGISTRY }}/$ECR_REPOSITORY:latest
 
-      - name: Push Docker Image
+      - name: Push Docker Images
         run: |
           docker push ${{ secrets.REGISTRY }}/$ECR_REPOSITORY:${{ github.run_number }}
           docker push ${{ secrets.REGISTRY }}/$ECR_REPOSITORY:latest
 
-  DEPLOYTOEKS:
+  DEPLOY_TO_EKS:
     needs: BUILD_AND_PUBLISH
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
+      - name: Checkout Source Code
         uses: actions/checkout@v4
 
       - name: Configure AWS Credentials
@@ -97,6 +103,9 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Verify AWS Identity
+        run: aws sts get-caller-identity
+
       - name: Configure kubectl
         run: |
           aws eks update-kubeconfig \
@@ -104,10 +113,17 @@ jobs:
             --name ${{ env.EKS_CLUSTER }}
 
       - name: Verify Cluster
-        run: kubectl get nodes
-
-      - name: Create ECR Pull Secret
         run: |
+          kubectl config current-context
+          kubectl get nodes
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Create or Update Image Pull Secret
+        run: |
+          kubectl create namespace ${{ env.NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
+
           kubectl create secret docker-registry regcred \
             --docker-server=${{ secrets.REGISTRY }} \
             --docker-username=AWS \
@@ -116,9 +132,12 @@ jobs:
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Setup Helm
-        uses: Azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2
+        uses: Azure/setup-helm@v5.0.0
 
-      - name: Helm Upgrade/Install
+      - name: Check Helm Version
+        run: helm version
+
+      - name: Deploy Application
         run: |
           helm upgrade --install vprofile-stack ./helm/vprofilecharts \
             --namespace ${{ env.NAMESPACE }} \
@@ -130,3 +149,4 @@ jobs:
         run: |
           kubectl get pods -n ${{ env.NAMESPACE }}
           kubectl get svc -n ${{ env.NAMESPACE }}
+          helm list -n ${{ env.NAMESPACE }}
